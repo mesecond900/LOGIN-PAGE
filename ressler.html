@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Device Manager</title>
+
+<style>
+    body {
+        background: #0A0E23;
+        font-family: Arial;
+        color: #cfe2ff;
+        margin: 0;
+    }
+
+    h2 {
+        text-align: center;
+        color: #69a6ff;
+        margin-top: 20px;
+    }
+
+    .container {
+        width: 90%;
+        max-width: 700px;
+        margin: auto;
+        background: #111830;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 0 20px #0040ff55;
+        margin-top: 20px;
+    }
+
+    /* Tabs */
+    .tabs {
+        display: flex;
+        background: #0F1430;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 15px;
+    }
+
+    .tab {
+        flex: 1;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        color: #9ab8ff;
+        font-size: 16px;
+        border-bottom: 3px solid transparent;
+    }
+
+    .tab.active {
+        color: #fff;
+        background: #1a2b50;
+        border-bottom: 3px solid #4d8bff;
+    }
+
+    .input-box {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        background: #0E1638;
+        border: 1px solid #29427A;
+        border-radius: 6px;
+        color: #d7e3ff;
+    }
+
+    button {
+        width: 100%;
+        background: #1F5CFF;
+        padding: 12px;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-size: 16px;
+        margin-top: 10px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #003CDE;
+    }
+
+    .user-card {
+        background: #0f1738;
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 6px;
+        border-left: 4px solid #1d5cff;
+        position: relative;
+    }
+
+    .edit-btn, .delete-btn {
+        padding: 5px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+        margin-left: 5px;
+    }
+
+    .edit-btn { background: #ffaa00; color: black; }
+    .delete-btn { background: #ff3b3b; }
+</style>
+</head>
+
+<body>
+
+<h2>RESELLER MANAGER</h2>
+
+<div class="container">
+
+    <!-- TABS -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('add', this)">Add User</div>
+        <div class="tab" onclick="switchTab('list', this)">Users List</div>
+    </div>
+
+    <!-- ADD USER AREA -->
+    <div id="add">
+        <input class="input-box" id="deviceId" placeholder="Device ID">
+        <input class="input-box" id="username" placeholder="Username">
+        <input class="input-box" id="password" placeholder="Password">
+
+        <label>Expiry (Optional)</label>
+        <input type="date" class="input-box" id="expiry">
+
+        <button onclick="saveUser()">Save</button>
+    </div>
+
+    <!-- USERS LIST -->
+    <div id="list" style="display:none;">
+        <div id="users"></div>
+    </div>
+
+</div>
+
+<script>
+
+// USER STORAGE
+let users = [];
+let editIndex = -1;
+
+// GITHUB CONFIG
+const GITHUB_TOKEN = "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";
+const RAW_URL = "https://raw.githubusercontent.com/mesecond900/key.json/refs/heads/main/key.json";
+const API_URL = "https://api.github.com/repos/mesecond900/key.json/contents/key.json";
+
+// Tabs Switcher
+function switchTab(id, tab) {
+    document.getElementById("add").style.display = (id === "add") ? "block" : "none";
+    document.getElementById("list").style.display = (id === "list") ? "block" : "none";
+
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+}
+
+// Load users from GitHub
+async function loadUsers() {
+    try {
+        let res = await fetch(RAW_URL + "?cache=" + Math.random());
+        users = await res.json();
+        renderUsers();
+    } catch (e) {
+        alert("Failed to load GitHub file!");
+    }
+}
+loadUsers();
+
+// Save or edit
+function saveUser() {
+    let obj = {
+        "Device Id": document.getElementById("deviceId").value,
+        username: document.getElementById("username").value,
+        password: document.getElementById("password").value,
+        expiry: document.getElementById("expiry").value || "UNLIMITED",
+    };
+
+    if (!obj["Device Id"] || !obj.username || !obj.password) {
+        alert("Please fill all required fields");
+        return;
+    }
+
+    if (editIndex === -1) users.push(obj);
+    else {
+        users[editIndex] = obj;
+        editIndex = -1;
+    }
+
+    updateGitHub();
+    switchTab('list', document.querySelectorAll(".tab")[1]);
+}
+
+// Show users
+function renderUsers() {
+    let box = document.getElementById("users");
+    box.innerHTML = "";
+
+    users.forEach((u, i) => {
+        box.innerHTML += `
+            <div class="user-card">
+                <b>${u.username}</b> — ${u["Device Id"]}
+                <br>Password: ${u.password}
+                <br>Expiry: ${u.expiry}
+
+                <div style="margin-top:8px;">
+                    <span class="edit-btn" onclick="editUser(${i})">EDIT</span>
+                    <span class="delete-btn" onclick="deleteUser(${i})">DELETE</span>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Edit user
+function editUser(i) {
+    editIndex = i;
+    let u = users[i];
+
+    document.getElementById("deviceId").value = u["Device Id"];
+    document.getElementById("username").value = u.username;
+    document.getElementById("password").value = u.password;
+    document.getElementById("expiry").value = (u.expiry === "UNLIMITED" ? "" : u.expiry);
+
+    switchTab('add', document.querySelectorAll(".tab")[0]);
+}
+
+// Delete user
+function deleteUser(i) {
+    if (!confirm("Delete this user?")) return;
+    users.splice(i, 1);
+    updateGitHub();
+}
+
+// Upload new JSON to GitHub
+async function updateGitHub() {
+    let fileContent = JSON.stringify(users, null, 2);
+    let encoded = btoa(unescape(encodeURIComponent(fileContent)));
+
+    let get = await fetch(API_URL);
+    let info = await get.json();
+
+    await fetch(API_URL, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + GITHUB_TOKEN
+        },
+        body: JSON.stringify({
+            message: "Update JSON",
+            content: encoded,
+            sha: info.sha
+        })
+    });
+
+    alert("Updated Successfully!");
+    renderUsers();
+}
+
+</script>
+
+</body>
+</html>
