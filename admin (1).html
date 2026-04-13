@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Admin Panel - FF Diamond Store</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Poppins','Inter',sans-serif;background:#0d0d0d;color:#fff;min-height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+.toast{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:500;padding:13px 24px;border-radius:28px;font-size:13px;font-weight:700;max-width:360px;width:calc(100% - 40px);text-align:center;box-shadow:0 4px 30px rgba(0,0,0,0.5);display:none;animation:notifIn 0.3s ease}
+.toast.show{display:block}
+.toast.success{background:linear-gradient(135deg,#2ECC71,#27AE60);color:#fff}
+.toast.error{background:linear-gradient(135deg,#E74C3C,#C0392B);color:#fff}
+.toast.info{background:linear-gradient(135deg,#3498DB,#2980B9);color:#fff}
+
+.header{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:60px;background:linear-gradient(135deg,#1a0533,#0d1a3a);border-bottom:1px solid rgba(255,215,0,0.2)}
+.header h1{font-size:16px;font-weight:800;color:#FFD700}
+.header span{font-size:12px;color:#aaa}
+
+.container{max-width:900px;margin:0 auto;padding:16px 16px 64px}
+
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
+@media(min-width:640px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat-card{border-radius:14px;padding:16px;text-align:center;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)}
+.stat-card .num{font-size:22px;font-weight:800;color:#FFD700}
+.stat-card .label{font-size:11px;color:#888}
+
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.tab{border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#aaa;display:inline-flex;align-items:center;gap:6px}
+.tab.active{background:rgba(255,215,0,0.12);border-color:#FFD700;color:#FFD700}
+.tab .badge{font-size:10px;font-weight:700;padding:0 6px;border-radius:10px;background:#FF4444;color:#fff}
+
+.filter-btn{border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#aaa}
+.filter-btn.active{background:rgba(255,215,0,0.1);border-color:rgba(255,215,0,0.3);color:#FFD700}
+
+.card{border-radius:14px;padding:16px;margin-bottom:10px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)}
+
+.search-box{display:flex;align-items:center;gap:8px;border-radius:12px;padding:12px;margin-bottom:16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1)}
+.search-box input{background:transparent;border:none;outline:none;color:#fff;font-size:14px;flex:1;font-family:'Poppins',sans-serif}
+
+.btn{border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;border:none;color:#fff;display:inline-flex;align-items:center;gap:4px}
+.btn-approve{background:linear-gradient(135deg,#2ECC71,#27AE60)}
+.btn-reject{background:linear-gradient(135deg,#E74C3C,#C0392B)}
+.btn-complete{background:linear-gradient(135deg,#3498DB,#2980B9)}
+.btn-balance{background:linear-gradient(135deg,#2ECC71,#27AE60)}
+.btn-delete{background:linear-gradient(135deg,#E74C3C,#C0392B)}
+.btn-add{background:linear-gradient(135deg,#FFD700,#FF8C00);color:#000;width:100%;padding:12px;font-size:14px}
+
+.status-badge{font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap}
+.sb-approved{background:rgba(46,204,113,0.15);color:#2ECC71;border:1px solid rgba(46,204,113,0.3)}
+.sb-rejected{background:rgba(231,76,60,0.15);color:#E74C3C;border:1px solid rgba(231,76,60,0.3)}
+.sb-pending{background:rgba(243,156,18,0.15);color:#F39C12;border:1px solid rgba(243,156,18,0.3)}
+
+.admin-input{width:100%;border-radius:10px;padding:12px;font-size:14px;color:#fff;outline:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);font-family:'Poppins',sans-serif;margin-bottom:10px}
+
+.modal-overlay{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);padding:20px;display:none}
+.modal-overlay.open{display:flex}
+.modal-box{width:100%;max-width:360px;border-radius:20px;padding:24px;position:relative;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,215,0,0.2);animation:modalIn 0.25s ease}
+
+.hidden{display:none!important}
+
+@keyframes notifIn{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes modalIn{from{opacity:0;transform:scale(0.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<div class="header">
+  <h1>⚙️ Admin Panel</h1>
+  <span>Admin (Direct Access)</span>
+</div>
+
+<div class="container">
+  <div class="stats" id="statsBox"></div>
+  <div class="tabs" id="tabsBox"></div>
+  <div id="filterBox"></div>
+  <div id="contentBox"></div>
+</div>
+
+<div id="balModal" class="modal-overlay" onclick="if(event.target===this)closeBalModal()">
+  <div class="modal-box">
+    <button onclick="closeBalModal()" style="position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;background:rgba(255,255,255,0.08);border:none;cursor:pointer">×</button>
+    <h3 style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px">💳 Wallet Balance Update</h3>
+    <p id="balModalInfo" style="font-size:12px;color:#aaa;margin-bottom:16px"></p>
+    <input id="balAmountInput" class="admin-input" type="number" placeholder="Amount (+ add, - deduct)">
+    <input id="balNoteInput" class="admin-input" placeholder="Note (optional)">
+    <button class="btn btn-add" onclick="submitBalance()">Balance Update</button>
+    <button onclick="closeBalModal()" style="width:100%;border-radius:10px;padding:12px;font-size:14px;font-weight:600;margin-top:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#aaa;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBKiiJLoOY8K3UqNh0cUloKdzpSp8RlYMI",
+  authDomain: "grab-a8110.firebaseapp.com",
+  databaseURL: "https://grab-a8110-default-rtdb.firebaseio.com",
+  projectId: "grab-a8110",
+  storageBucket: "grab-a8110.firebasestorage.app",
+  messagingSenderId: "403309111033",
+  appId: "1:403309111033:web:7dbcf642adca7a08a56428"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+
+let allUsers={}, allDeposits={}, allOrders={}, allProducts=[];
+let currentTab='users', depositFilter='all', orderFilter='all', userSearch='';
+let balModalData=null;
+
+function showNotif(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;setTimeout(()=>t.classList.remove('show'),3500)}
+function timeStr(ts){return ts?new Date(ts).toLocaleString('en-PK',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}
+
+// Load data
+db.ref('users').on('value',s=>{allUsers={};if(s.exists())s.forEach(c=>{allUsers[c.key]=c.val()});render()},e=>showNotif('Users error: '+e.message,'error'));
+db.ref('depositRequests').on('value',s=>{allDeposits={};if(s.exists())s.forEach(c=>{allDeposits[c.key]={...c.val(),key:c.key}});render()},e=>showNotif('Deposits error: '+e.message,'error'));
+db.ref('orders').on('value',s=>{allOrders={};if(s.exists())s.forEach(c=>{allOrders[c.key]={...c.val(),key:c.key}});render()},e=>showNotif('Orders error: '+e.message,'error'));
+db.ref('products').on('value',s=>{allProducts=[];if(s.exists())s.forEach(c=>{allProducts.push({key:c.key,...c.val()})});render()});
+
+function render(){
+  const pendDep=Object.values(allDeposits).filter(d=>d.status==='pending').length;
+  const pendOrd=Object.values(allOrders).filter(o=>o.status==='pending').length;
+  const todayApproved=Object.values(allDeposits).filter(d=>d.status==='approved'&&(d.approvedAt||0)>=new Date().setHours(0,0,0,0)).length;
+
+  document.getElementById('statsBox').innerHTML=[
+    {icon:'👥',num:Object.keys(allUsers).length,label:'Total Users'},
+    {icon:'💰',num:pendDep,label:'Pending Deposits'},
+    {icon:'💎',num:pendOrd,label:'Pending Orders'},
+    {icon:'✅',num:todayApproved,label:'Approved Today'}
+  ].map(s=>`<div class="stat-card"><div style="font-size:24px;margin-bottom:6px">${s.icon}</div><div class="num">${s.num}</div><div class="label">${s.label}</div></div>`).join('');
+
+  const tabs=[{id:'users',icon:'👥',label:'Users'},{id:'deposits',icon:'🪙',label:'Deposits',badge:pendDep},{id:'orders',icon:'💎',label:'Orders',badge:pendOrd},{id:'products',icon:'➕',label:'Add Cards'}];
+  document.getElementById('tabsBox').innerHTML=tabs.map(t=>`<div class="tab ${currentTab===t.id?'active':''}" onclick="currentTab='${t.id}';render()">${t.icon} ${t.label}${t.badge&&t.badge>0?` <span class="badge">${t.badge}</span>`:''}</div>`).join('');
+
+  if(currentTab==='users') renderUsers();
+  else if(currentTab==='deposits') renderDeposits();
+  else if(currentTab==='orders') renderOrders();
+  else renderProducts();
+}
+
+function renderUsers(){
+  document.getElementById('filterBox').innerHTML=`<div class="search-box"><span style="color:#666">🔍</span><input value="${userSearch}" oninput="userSearch=this.value;renderUsers()" placeholder="Search users..."></div>`;
+  const users=Object.entries(allUsers).map(([k,v])=>({...v,uid:v.uid||k})).filter(u=>{
+    if(!userSearch)return true;const f=userSearch.toLowerCase();
+    return(u.displayName||'').toLowerCase().includes(f)||(u.email||'').toLowerCase().includes(f);
+  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(users.length===0){document.getElementById('contentBox').innerHTML='<div style="text-align:center;padding:40px 0;color:#666">No users found</div>';return;}
+  document.getElementById('contentBox').innerHTML=users.map(u=>`
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,#FFD700,#FF6B35)">
+        ${u.profilePic?`<img src="${u.profilePic}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(u.displayName||'U')[0].toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div style="font-size:14px;font-weight:700;color:#fff">${u.displayName||'Unknown'} ${u.isAdmin?'<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(255,215,0,0.15);color:#FFD700;border:1px solid rgba(255,215,0,0.3)">ADMIN</span>':''}</div>
+        <div style="font-size:11px;color:#888">${u.email||''}</div>
+        <div style="font-size:10px;color:#555">Joined: ${u.createdAt?new Date(u.createdAt).toLocaleDateString('en-PK',{day:'2-digit',month:'short',year:'numeric'}):'N/A'}</div>
+      </div>
+      <div style="border-radius:10px;padding:6px 12px;text-align:center;min-width:90px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2)">
+        <div style="font-size:10px;color:#aaa">Wallet</div>
+        <div style="font-size:16px;font-weight:800;color:#FFD700">PKR ${u.walletBalance||0}</div>
+      </div>
+      <button class="btn btn-balance" onclick="openBalModal('${u.uid}','${(u.displayName||'').replace(/'/g,"\\'")}',${u.walletBalance||0})">💳 Balance</button>
+    </div>`).join('');
+}
+
+function renderDeposits(){
+  document.getElementById('filterBox').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    ${['all','pending','approved','rejected'].map(f=>`<div class="filter-btn ${depositFilter===f?'active':''}" onclick="depositFilter='${f}';renderDeposits()">${f==='all'?'All':f==='pending'?'⏳ Pending':f==='approved'?'✅ Approved':'❌ Rejected'}</div>`).join('')}</div>`;
+  const deps=Object.values(allDeposits).filter(d=>depositFilter==='all'||d.status===depositFilter).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(deps.length===0){document.getElementById('contentBox').innerHTML='<div style="text-align:center;padding:40px 0;color:#666">No deposits</div>';return;}
+  document.getElementById('contentBox').innerHTML=deps.map(d=>{
+    const sc=d.status==='approved'?'sb-approved':d.status==='rejected'?'sb-rejected':'sb-pending';
+    const sl=d.status==='approved'?'✅ Approved':d.status==='rejected'?'❌ Rejected':'⏳ Pending';
+    const bc=d.status==='approved'?'#2ECC71':d.status==='rejected'?'#E74C3C':'#F39C12';
+    return `<div class="card" style="border-left:4px solid ${bc}">
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:#FFD700">PKR ${d.amount}</div>
+          <div style="font-size:12px;margin-top:2px;color:#aaa">📱 ${d.paymentMethod||'N/A'}</div>
+          <div style="font-size:11px;margin-top:2px;font-weight:600;color:#4ECDC4">TRX: ${d.transactionId||'N/A'}</div>
+          <div style="font-size:12px;margin-top:4px;color:#bbb">👤 ${d.userName||'Unknown'} • <span style="color:#888;font-size:10px">${d.userEmail||''}</span></div>
+          <div style="font-size:10px;margin-top:4px;color:#666">${timeStr(d.createdAt)}</div>
+        </div>
+        <span class="status-badge ${sc}">${sl}</span>
+      </div>
+      ${d.status==='pending'?`<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-approve" onclick="approveDeposit('${d.key}','${d.userId}',${d.amount})">✅ Approve</button>
+        <button class="btn btn-reject" onclick="rejectDeposit('${d.key}','${d.userId}',${d.amount})">❌ Reject</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderOrders(){
+  document.getElementById('filterBox').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    ${['all','pending','completed','rejected'].map(f=>`<div class="filter-btn ${orderFilter===f?'active':''}" onclick="orderFilter='${f}';renderOrders()">${f==='all'?'All':f==='pending'?'⏳ Pending':f==='completed'?'✅ Completed':'❌ Rejected'}</div>`).join('')}</div>`;
+  const ords=Object.values(allOrders).filter(o=>orderFilter==='all'||o.status===orderFilter).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(ords.length===0){document.getElementById('contentBox').innerHTML='<div style="text-align:center;padding:40px 0;color:#666">No orders</div>';return;}
+  document.getElementById('contentBox').innerHTML=ords.map(o=>{
+    const sc=o.status==='completed'?'sb-approved':o.status==='rejected'?'sb-rejected':'sb-pending';
+    const sl=o.status==='completed'?'✅ Completed':o.status==='rejected'?'❌ Rejected':'⏳ Pending';
+    const bc=o.status==='completed'?'#2ECC71':o.status==='rejected'?'#E74C3C':'#F39C12';
+    return `<div class="card" style="border-left:4px solid ${bc}">
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:#FFD700">💎 ${o.diamonds} Diamonds</div>
+          <div style="font-size:14px;font-weight:700;margin-top:2px;color:#4ECDC4">PKR ${o.price}</div>
+          <div style="font-size:11px;margin-top:2px;color:#bbb">🎮 Player ID: <span style="color:#4ECDC4;font-weight:600">${o.playerId||'N/A'}</span></div>
+          <div style="font-size:12px;margin-top:4px;color:#bbb">👤 ${o.userName||'Unknown'} • <span style="color:#888;font-size:10px">${o.userEmail||''}</span></div>
+          <div style="font-size:10px;margin-top:4px;color:#666">${timeStr(o.createdAt)}</div>
+        </div>
+        <span class="status-badge ${sc}">${sl}</span>
+      </div>
+      ${o.status==='pending'?`<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-complete" onclick="completeOrder('${o.key}','${o.userId}',${o.diamonds})">✅ Complete</button>
+        <button class="btn btn-reject" onclick="rejectOrder('${o.key}','${o.userId}',${o.price},${o.diamonds})">❌ Reject & Refund</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderProducts(){
+  document.getElementById('filterBox').innerHTML='';
+  let html=`<div class="card" style="border:1px solid rgba(255,215,0,0.2);margin-bottom:20px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:16px;color:#FFD700;display:flex;align-items:center;gap:8px">➕ New Diamond Card</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <input id="ncDiamonds" class="admin-input" style="margin:0" type="number" placeholder="💎 Diamonds">
+      <input id="ncPrice" class="admin-input" style="margin:0" type="number" placeholder="💰 Price PKR">
+    </div>
+    <input id="ncLabel" class="admin-input" placeholder="Label (optional)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <input id="ncBadge" class="admin-input" style="margin:0" placeholder="Badge text">
+      <select id="ncBadgeClass" class="admin-input" style="margin:0">
+        <option value="">-- Badge Color --</option>
+        <option value="badge-hot">🔥 Hot (Red)</option>
+        <option value="badge-value">💎 Value (Cyan)</option>
+        <option value="badge-ultimate">⭐ Ultimate (Gold)</option>
+        <option value="badge-premium">👑 Premium (Purple)</option>
+      </select>
+    </div>
+    <input id="ncImgUrl" class="admin-input" placeholder="Image URL (optional)">
+    <button class="btn btn-add" onclick="addCard()">➕ Add Card to Shop</button>
+  </div>
+  <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;color:#FFD700;display:flex;align-items:center;gap:8px">📋 Custom Cards</h3>`;
+  if(allProducts.length===0) html+='<div style="text-align:center;padding:40px 0;color:#666">No custom cards. Default cards always show.</div>';
+  else allProducts.forEach(p=>{
+    html+=`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:2px solid rgba(30,100,255,0.5);box-shadow:0 6px 20px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="${p.imgUrl||'https://i.postimg.cc/SxDMvqgm/diamond.png'}" style="width:45px;height:45px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(78,205,196,0.5))">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:#FFD700">💎 ${p.diamonds} Diamonds</div>
+          <div style="font-size:14px;font-weight:700;color:#4ECDC4">PKR ${p.price}</div>
+          <div style="font-size:11px;color:#aaa">${p.label||''} ${p.badge?'• Badge: '+p.badge:''}</div>
+        </div>
+      </div>
+      <button class="btn btn-delete" onclick="deleteProduct('${p.key}')">🗑️ Delete</button>
+    </div>`;
+  });
+  document.getElementById('contentBox').innerHTML=html;
+}
+
+// ── ACTIONS ──
+async function approveDeposit(key,userId,amount){
+  if(!confirm('PKR '+amount+' deposit approve karein?'))return;
+  try{
+    await db.ref('depositRequests/'+key).update({status:'approved',approvedAt:Date.now()});
+    if(userId){
+      const snap=await db.ref('users/'+userId).once('value');
+      if(snap.exists()){const bal=snap.val().walletBalance||0;await db.ref('users/'+userId).update({walletBalance:bal+amount})}
+      const nr=db.ref('notifications/'+userId).push();
+      await nr.set({title:'✅ Deposit Approved',message:'Aapka PKR '+amount+' ka deposit approve ho gaya. Wallet update ho gaya!',type:'deposit_approved',read:false,createdAt:Date.now()});
+    }
+    showNotif('PKR '+amount+' deposit approved!','success');
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+async function rejectDeposit(key,userId,amount){
+  if(!confirm('PKR '+amount+' deposit reject karein?'))return;
+  try{
+    await db.ref('depositRequests/'+key).update({status:'rejected',rejectedAt:Date.now()});
+    if(userId){const nr=db.ref('notifications/'+userId).push();await nr.set({title:'❌ Deposit Rejected',message:'Aapki PKR '+amount+' deposit request reject ho gayi.',type:'deposit_rejected',read:false,createdAt:Date.now()})}
+    showNotif('Deposit rejected.','info');
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+async function completeOrder(key,userId,diamonds){
+  if(!confirm(diamonds+' diamonds order complete karein?'))return;
+  try{
+    await db.ref('orders/'+key).update({status:'completed',completedAt:Date.now()});
+    if(userId){const nr=db.ref('notifications/'+userId).push();await nr.set({title:'💎 Order Completed',message:'Aapka '+diamonds+' diamonds ka order deliver ho gaya!',type:'order_completed',read:false,createdAt:Date.now()})}
+    showNotif('Order completed!','success');
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+async function rejectOrder(key,userId,price,diamonds){
+  if(!confirm(diamonds+' diamonds order reject & PKR '+price+' refund?'))return;
+  try{
+    await db.ref('orders/'+key).update({status:'rejected',rejectedAt:Date.now()});
+    if(userId){
+      const snap=await db.ref('users/'+userId).once('value');
+      if(snap.exists()){const bal=snap.val().walletBalance||0;await db.ref('users/'+userId).update({walletBalance:bal+price})}
+      const nr=db.ref('notifications/'+userId).push();await nr.set({title:'❌ Order Rejected & Refunded',message:'Aapka '+diamonds+' diamonds ka order reject ho gaya. PKR '+price+' wallet mein wapis.',type:'order_rejected',read:false,createdAt:Date.now()});
+    }
+    showNotif('Order rejected & refunded.','info');
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+function openBalModal(uid,name,bal){balModalData={uid,name,bal};document.getElementById('balModalInfo').textContent='User: '+name+' | Current: PKR '+bal;document.getElementById('balModal').classList.add('open')}
+function closeBalModal(){document.getElementById('balModal').classList.remove('open');balModalData=null}
+
+async function submitBalance(){
+  if(!balModalData)return;
+  const amt=parseFloat(document.getElementById('balAmountInput').value);
+  if(isNaN(amt))return showNotif('Valid amount daalein','error');
+  try{
+    const snap=await db.ref('users/'+balModalData.uid).once('value');
+    if(!snap.exists())return showNotif('User not found','error');
+    const bal=snap.val().walletBalance||0;const newBal=Math.max(0,bal+amt);
+    await db.ref('users/'+balModalData.uid).update({walletBalance:newBal});
+    const nr=db.ref('notifications/'+balModalData.uid).push();
+    await nr.set({title:amt>=0?'💰 Balance Added':'💸 Balance Deducted',message:Math.abs(amt)+' PKR '+(amt>=0?'add':'deduct')+' hua. New: PKR '+newBal,type:amt>=0?'balance_added':'balance_deducted',read:false,createdAt:Date.now()});
+    showNotif('Balance updated: PKR '+newBal,'success');
+    closeBalModal();
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+async function addCard(){
+  const diamonds=parseInt(document.getElementById('ncDiamonds').value);
+  const price=parseInt(document.getElementById('ncPrice').value);
+  if(!diamonds||diamonds<=0)return showNotif('Valid diamonds count','error');
+  if(!price||price<=0)return showNotif('Valid price','error');
+  try{
+    const r=db.ref('products').push();
+    await r.set({diamonds,price,label:document.getElementById('ncLabel').value,badge:document.getElementById('ncBadge').value,badgeClass:document.getElementById('ncBadgeClass').value,imgUrl:document.getElementById('ncImgUrl').value});
+    showNotif('Card added!','success');
+    document.getElementById('ncDiamonds').value='';document.getElementById('ncPrice').value='';
+    document.getElementById('ncLabel').value='';document.getElementById('ncBadge').value='';
+    document.getElementById('ncBadgeClass').value='';document.getElementById('ncImgUrl').value='';
+  }catch(e){showNotif('Error: '+e.message,'error')}
+}
+
+async function deleteProduct(key){
+  if(!confirm('Delete this card?'))return;
+  try{await db.ref('products/'+key).remove();showNotif('Card deleted','info')}catch(e){showNotif('Error: '+e.message,'error')}
+}
+</script>
+</body>
+</html>
